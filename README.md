@@ -1,18 +1,36 @@
-# Genesys A2A Bridge (Unofficial)
+# Genesys Cloud ↔ A2A Protocol (Unofficial)
 
-A [Google Agent2Agent (A2A) protocol](https://google.github.io/A2A/) server that exposes a Genesys Cloud Agentic Virtual Agent (AVA) — connected to an Architect Bot Flow and a Messenger deployment — as a standard A2A endpoint. External agents can send tasks to this server exactly as they would to any other A2A-compliant agent.
+Connect Genesys Cloud with any [Google Agent2Agent (A2A)](https://google.github.io/A2A/) compliant agent — in either direction.
 
 > **Unofficial.** This project is not affiliated with or supported by Genesys or Google.
+
+## Two Integration Patterns
+
+This repo covers two independent patterns. Pick the one that matches your use case — or use both.
+
+| | **Inbound Bridge** | **Outbound Data Actions** |
+|---|---|---|
+| **Direction** | External agent → Genesys AVA | Genesys flow → external agent |
+| **What it does** | Exposes a Genesys AVA as a standard A2A endpoint so external agents can send it tasks | Lets Architect flows call any external A2A agent via Genesys Data Actions |
+| **You deploy** | A Node.js bridge server (`src/`) | Nothing — import JSON files into Genesys Admin |
+| **When to use** | You have an external orchestrator (Google ADK, LangGraph, etc.) that needs to talk to your Genesys bot | Your Genesys flow needs to consult an external AI agent mid-conversation |
+| **Section** | [Inbound Bridge →](#inbound-bridge-external-agents--genesys-ava) | [Outbound Data Actions →](#outbound-data-actions-genesys-flows--external-a2a-agents) |
+
+---
+
+# Inbound Bridge: External Agents → Genesys AVA
+
+A Node.js server that implements the A2A protocol and translates tasks into Genesys Open Messaging conversations. External agents send JSON-RPC 2.0 requests to this server; it forwards them to your Architect Bot Flow / AVA and returns the reply.
 
 ## How It Works
 
 ```
-External Agent
+External A2A Agent
      │
      │  POST /  (JSON-RPC 2.0 — tasks/send)
      │  Authorization: Bearer <oidc-token>  OR  x-api-key: <key>
      ▼
-Genesys A2A Bridge
+Genesys A2A Bridge  (this server)
      │
      │  POST /api/v2/conversations/messages/inbound/open
      ▼
@@ -28,7 +46,7 @@ Genesys A2A Bridge
      │
      │  A2A Task result (artifact)
      ▼
-External Agent
+External A2A Agent
 ```
 
 Each A2A task maps to a Genesys Open Messaging conversation. The bridge:
@@ -106,8 +124,6 @@ The server starts and logs a prominent warning:
 ```
 All task requests will be rejected with `401 Unauthorized`. This is intentional — the server does not silently pass unauthenticated traffic to your Genesys environment.
 
----
-
 ## Prerequisites
 
 - Node.js 18+
@@ -119,7 +135,7 @@ All task requests will be rejected with `401 Unauthorized`. This is intentional 
     - `conversations:message:create` and `conversations:message:view`
     - `notifications:subscription:add`
 
-## Setup
+## Bridge Setup
 
 ### 1. Create an Open Messaging Integration
 
@@ -182,8 +198,6 @@ Startup output:
 [a2a-bridge] Region: us-east-1
 [a2a-bridge] Auth: OIDC (https://accounts.google.com) + API key
 ```
-
----
 
 ## A2A Endpoints
 
@@ -285,14 +299,12 @@ Response (once AVA replies):
 
 ---
 
-## Option C — Calling External A2A Agents from Genesys Cloud (Data Actions)
+# Outbound Data Actions: Genesys Flows → External A2A Agents
 
-The bridge above handles the *inbound* direction: external agents calling a Genesys AVA. **Data Actions** handle the *outbound* direction: Genesys Architect flows calling an external A2A agent directly, no bridge server required.
-
-A Data Action is a reusable HTTP integration block you drop into any Architect flow (Bot Flow, Inbound Message Flow, Digital Bot Flow). Import one of the provided JSON files, point it at your A2A endpoint, attach credentials, and the flow can send tasks to any A2A-compliant agent and read the reply.
+No bridge server needed. Import a Data Action JSON file into Genesys Cloud and call any external A2A agent directly from an Architect flow.
 
 ```
-Architect Flow
+Architect Flow (Bot Flow, Inbound Message Flow, Digital Bot Flow)
      │
      │  Data Action — POST / (JSON-RPC 2.0 tasks/send)
      │  x-api-key or Authorization: Bearer <token>
@@ -304,7 +316,9 @@ External A2A Agent  (Google ADK, LangGraph, CrewAI, this bridge, …)
 Architect Flow continues with agent reply
 ```
 
-### Example Data Actions
+A Data Action is a reusable HTTP integration block you drop into any Architect flow. Import one of the provided JSON files, point it at your A2A endpoint, attach credentials, and the flow can send tasks to any A2A-compliant agent and read the reply.
+
+## Example Data Actions
 
 Four ready-to-import files are in the [`data-actions/`](./data-actions/) folder:
 
@@ -315,70 +329,18 @@ Four ready-to-import files are in the [`data-actions/`](./data-actions/) folder:
 | [`send-task-langgraph-structured.json`](./data-actions/send-task-langgraph-structured.json) | API key | LangGraph agents; sends customer context as a structured `data` part alongside the message |
 | [`get-task-status.json`](./data-actions/get-task-status.json) | API key | Poll task state — use in an Architect Loop to wait on long-running tasks |
 
-### Setup
+See [`data-actions/README.md`](./data-actions/README.md) for full setup instructions, Architect wiring, multi-turn patterns, and async polling.
 
-#### 1. Enable a Custom REST Actions integration
+## Quick Start
 
-1. Go to **Admin > Integrations**
-2. Click **+ Integrations** and search for **Custom REST Actions**
-3. Install it and give it a name (e.g., "A2A Agents")
-4. Under **Configuration > Credentials**, add your API key or Bearer token as a credential
-
-#### 2. Import a Data Action
-
-1. Go to **Admin > Integrations > Actions**
-2. Click **Import**
-3. Select one of the JSON files from the `data-actions/` folder
-4. On import, Genesys will ask you to associate the action with your Custom REST Actions integration — select the one you created above
-
-#### 3. Edit the URL
-
-After import, open the action and update the `requestUrlTemplate` to point at your A2A agent:
-
-```
-https://your-a2a-agent-url   →   https://my-langgraph-agent.example.com
-```
-
-Save and **Publish** the action.
-
-#### 4. Use it in an Architect flow
-
-In any Architect Bot Flow or Inbound Message Flow:
-
-1. Add a **Call Data Action** step
-2. Select your imported action
-3. Map flow variables to the input fields:
-   - `taskId` → a unique string, e.g. `{{Conversation.Id}}-1`
-   - `sessionId` → `{{Conversation.Id}}` (reuse across turns)
-   - `message` → the customer's utterance
-4. Map the output `responseText` to a flow variable
-5. Use a **Say** or **Send Response** step to speak/send the reply
-
-#### Multi-turn conversations
-
-Reuse the same `sessionId` across subsequent Data Action calls within the same conversation. A2A agents use this to look up prior context, so customers don't have to repeat themselves:
-
-```
-Turn 1:  sessionId = {{Conversation.Id}},  message = "What's my balance?"
-Turn 2:  sessionId = {{Conversation.Id}},  message = "And the due date?"
-```
-
-#### Polling for long-running tasks
-
-Some agents return `taskState: working` on the first call. Use the `get-task-status` action inside an Architect **Loop** to poll until the state is `completed` or `failed`:
-
-```
-[Call Data Action: send-task-langgraph-structured]  →  store taskId
-[Loop while taskState == "working"]
-  [Call Data Action: get-task-status]  →  update taskState, responseText
-  [Wait 2s]
-[End Loop]
-[Say responseText]
-```
+1. **Admin > Integrations** → install a **Custom REST Actions** integration → add your API key or Bearer token as a credential
+2. **Admin > Integrations > Actions** → **Import** → select a JSON file from `data-actions/`
+3. Open the action → update the `requestUrlTemplate` to your agent's URL → **Publish**
+4. In Architect, add a **Call Data Action** step → map `taskId`, `sessionId`, `message` → use the `responseText` output
 
 ---
 
-## Architecture
+# Architecture (Bridge Server)
 
 ```
 src/
@@ -393,7 +355,7 @@ src/
     └── auth.ts             # OIDC Bearer + API key validation middleware
 ```
 
-## Production Considerations
+# Production Considerations
 
 **Persistence**
 Task state is in-memory and lost on restart. Replace `TaskManager`'s internal `Map` with Redis or a database. The `prune()` method handles TTL-based cleanup for completed tasks.
