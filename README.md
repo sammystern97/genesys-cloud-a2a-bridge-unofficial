@@ -285,6 +285,99 @@ Response (once AVA replies):
 
 ---
 
+## Option C — Calling External A2A Agents from Genesys Cloud (Data Actions)
+
+The bridge above handles the *inbound* direction: external agents calling a Genesys AVA. **Data Actions** handle the *outbound* direction: Genesys Architect flows calling an external A2A agent directly, no bridge server required.
+
+A Data Action is a reusable HTTP integration block you drop into any Architect flow (Bot Flow, Inbound Message Flow, Digital Bot Flow). Import one of the provided JSON files, point it at your A2A endpoint, attach credentials, and the flow can send tasks to any A2A-compliant agent and read the reply.
+
+```
+Architect Flow
+     │
+     │  Data Action — POST / (JSON-RPC 2.0 tasks/send)
+     │  x-api-key or Authorization: Bearer <token>
+     ▼
+External A2A Agent  (Google ADK, LangGraph, CrewAI, this bridge, …)
+     │
+     │  JSON-RPC 2.0 response — artifacts[0].parts[0].text
+     ▼
+Architect Flow continues with agent reply
+```
+
+### Example Data Actions
+
+Four ready-to-import files are in the [`data-actions/`](./data-actions/) folder:
+
+| File | Auth | Use case |
+|---|---|---|
+| [`send-task-generic-apikey.json`](./data-actions/send-task-generic-apikey.json) | API key (`x-api-key`) | Works with any A2A endpoint, including this bridge |
+| [`send-task-google-adk-bearer.json`](./data-actions/send-task-google-adk-bearer.json) | OIDC Bearer token | Google ADK agents; forwards Genesys conversation ID as metadata |
+| [`send-task-langgraph-structured.json`](./data-actions/send-task-langgraph-structured.json) | API key | LangGraph agents; sends customer context as a structured `data` part alongside the message |
+| [`get-task-status.json`](./data-actions/get-task-status.json) | API key | Poll task state — use in an Architect Loop to wait on long-running tasks |
+
+### Setup
+
+#### 1. Enable a Custom REST Actions integration
+
+1. Go to **Admin > Integrations**
+2. Click **+ Integrations** and search for **Custom REST Actions**
+3. Install it and give it a name (e.g., "A2A Agents")
+4. Under **Configuration > Credentials**, add your API key or Bearer token as a credential
+
+#### 2. Import a Data Action
+
+1. Go to **Admin > Integrations > Actions**
+2. Click **Import**
+3. Select one of the JSON files from the `data-actions/` folder
+4. On import, Genesys will ask you to associate the action with your Custom REST Actions integration — select the one you created above
+
+#### 3. Edit the URL
+
+After import, open the action and update the `requestUrlTemplate` to point at your A2A agent:
+
+```
+https://your-a2a-agent-url   →   https://my-langgraph-agent.example.com
+```
+
+Save and **Publish** the action.
+
+#### 4. Use it in an Architect flow
+
+In any Architect Bot Flow or Inbound Message Flow:
+
+1. Add a **Call Data Action** step
+2. Select your imported action
+3. Map flow variables to the input fields:
+   - `taskId` → a unique string, e.g. `{{Conversation.Id}}-1`
+   - `sessionId` → `{{Conversation.Id}}` (reuse across turns)
+   - `message` → the customer's utterance
+4. Map the output `responseText` to a flow variable
+5. Use a **Say** or **Send Response** step to speak/send the reply
+
+#### Multi-turn conversations
+
+Reuse the same `sessionId` across subsequent Data Action calls within the same conversation. A2A agents use this to look up prior context, so customers don't have to repeat themselves:
+
+```
+Turn 1:  sessionId = {{Conversation.Id}},  message = "What's my balance?"
+Turn 2:  sessionId = {{Conversation.Id}},  message = "And the due date?"
+```
+
+#### Polling for long-running tasks
+
+Some agents return `taskState: working` on the first call. Use the `get-task-status` action inside an Architect **Loop** to poll until the state is `completed` or `failed`:
+
+```
+[Call Data Action: send-task-langgraph-structured]  →  store taskId
+[Loop while taskState == "working"]
+  [Call Data Action: get-task-status]  →  update taskState, responseText
+  [Wait 2s]
+[End Loop]
+[Say responseText]
+```
+
+---
+
 ## Architecture
 
 ```

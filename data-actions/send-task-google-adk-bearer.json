@@ -1,0 +1,88 @@
+{
+  "name": "A2A — Send Task to Google ADK Agent (Bearer)",
+  "integrationType": {
+    "id": "custom-rest-actions"
+  },
+  "config": {
+    "request": {
+      "requestUrlTemplate": "https://your-google-adk-agent-url",
+      "requestType": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer ${credentials.bearerToken}"
+      },
+      "requestTemplate": "{\"jsonrpc\":\"2.0\",\"id\":\"${input.taskId}\",\"method\":\"tasks/send\",\"params\":{\"id\":\"${input.taskId}\",\"sessionId\":\"${input.sessionId}\",\"message\":{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"text\":\"${input.message}\"}]},\"metadata\":{\"caller\":\"genesys-cloud\",\"conversationId\":\"${input.genesysConversationId}\"}}}"
+    },
+    "response": {
+      "translationMap": {
+        "responseText": "$.result.artifacts[0].parts[0].text",
+        "taskState": "$.result.status.state",
+        "taskId": "$.result.id",
+        "statusMessage": "$.result.status.message.parts[0].text"
+      },
+      "translationMapDefaults": {
+        "responseText": "",
+        "taskState": "failed",
+        "taskId": "",
+        "statusMessage": ""
+      },
+      "successTemplate": "{\"responseText\": ${successTemplateUtils.jsonencode(responseText)}, \"taskState\": ${successTemplateUtils.jsonencode(taskState)}, \"taskId\": ${successTemplateUtils.jsonencode(taskId)}, \"statusMessage\": ${successTemplateUtils.jsonencode(statusMessage)}}"
+    }
+  },
+  "contract": {
+    "input": {
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-04/schema#",
+        "title": "Send Task to Google ADK Agent",
+        "description": "Send a task to a Google Agent Development Kit (ADK) agent that implements the A2A protocol, authenticated with an OIDC Bearer token. The Genesys conversation ID is forwarded as metadata so the ADK agent can correlate calls.",
+        "type": "object",
+        "required": ["taskId", "sessionId", "message", "genesysConversationId"],
+        "properties": {
+          "taskId": {
+            "description": "Unique task ID. Recommended: use {{Conversation.Id}}-{{Flow.Invocation.Id}} to guarantee uniqueness.",
+            "type": "string"
+          },
+          "sessionId": {
+            "description": "Session ID for multi-turn continuity. Reuse across turns — the ADK agent uses this to maintain conversation state.",
+            "type": "string"
+          },
+          "message": {
+            "description": "The user message to send to the ADK agent.",
+            "type": "string"
+          },
+          "genesysConversationId": {
+            "description": "Genesys conversation ID forwarded as metadata. Use {{Conversation.Id}}.",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "output": {
+      "successSchema": {
+        "$schema": "http://json-schema.org/draft-04/schema#",
+        "title": "ADK Agent Task Result",
+        "type": "object",
+        "properties": {
+          "responseText": {
+            "description": "The agent's reply text.",
+            "type": "string"
+          },
+          "taskState": {
+            "description": "Final task state: completed, failed, canceled, or input-required.",
+            "type": "string"
+          },
+          "taskId": {
+            "description": "The task ID echoed from the response.",
+            "type": "string"
+          },
+          "statusMessage": {
+            "description": "Optional status message from the agent (e.g. escalation reason).",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

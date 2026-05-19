@@ -1,0 +1,76 @@
+{
+  "name": "A2A — Get Task Status",
+  "integrationType": {
+    "id": "custom-rest-actions"
+  },
+  "config": {
+    "request": {
+      "requestUrlTemplate": "https://your-a2a-agent-url",
+      "requestType": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "x-api-key": "${credentials.apiKey}"
+      },
+      "requestTemplate": "{\"jsonrpc\":\"2.0\",\"id\":\"poll-${input.taskId}\",\"method\":\"tasks/get\",\"params\":{\"id\":\"${input.taskId}\",\"historyLength\":0}}"
+    },
+    "response": {
+      "translationMap": {
+        "taskState": "$.result.status.state",
+        "responseText": "$.result.artifacts[0].parts[0].text",
+        "taskId": "$.result.id",
+        "timestamp": "$.result.status.timestamp"
+      },
+      "translationMapDefaults": {
+        "taskState": "unknown",
+        "responseText": "",
+        "taskId": "",
+        "timestamp": ""
+      },
+      "successTemplate": "{\"taskState\": ${successTemplateUtils.jsonencode(taskState)}, \"responseText\": ${successTemplateUtils.jsonencode(responseText)}, \"taskId\": ${successTemplateUtils.jsonencode(taskId)}, \"timestamp\": ${successTemplateUtils.jsonencode(timestamp)}}"
+    }
+  },
+  "contract": {
+    "input": {
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-04/schema#",
+        "title": "Get A2A Task Status",
+        "description": "Poll an A2A agent for the current status of a previously submitted task. Useful in Architect flows that use a Loop action to wait for long-running agent tasks to complete. Call tasks/send first, store the taskId, then poll with this action until taskState is 'completed' or 'failed'.",
+        "type": "object",
+        "required": ["taskId"],
+        "properties": {
+          "taskId": {
+            "description": "Task ID returned or echoed from the original tasks/send call.",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "output": {
+      "successSchema": {
+        "$schema": "http://json-schema.org/draft-04/schema#",
+        "title": "A2A Task Status",
+        "type": "object",
+        "properties": {
+          "taskState": {
+            "description": "Current task state: submitted, working, completed, failed, canceled, or input-required.",
+            "type": "string"
+          },
+          "responseText": {
+            "description": "The agent's reply text, populated once the task reaches 'completed'.",
+            "type": "string"
+          },
+          "taskId": {
+            "description": "The task ID echoed from the response.",
+            "type": "string"
+          },
+          "timestamp": {
+            "description": "ISO-8601 timestamp of the last status update.",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}
