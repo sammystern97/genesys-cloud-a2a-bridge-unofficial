@@ -4,6 +4,31 @@ Connect Genesys Cloud with any [Google Agent2Agent (A2A)](https://google.github.
 
 > **Unofficial.** This project is not affiliated with or supported by Genesys or Google.
 
+## Table of Contents
+
+**[Two Integration Patterns](#two-integration-patterns)** — decision table to pick your approach
+
+**Inbound Bridge** — external agents call your Genesys AVA
+- [How It Works](#how-it-works)
+- [Security](#security) — [OIDC Bearer Token](#option-a--oidc-bearer-token-recommended) · [Static API Key](#option-b--static-api-key)
+- [Prerequisites](#prerequisites)
+- [Bridge Setup](#bridge-setup) — [Open Messaging](#1-create-an-open-messaging-integration) · [Bot Flow](#2-connect-the-bot-flow) · [Install](#3-install-and-build) · [Environment](#4-configure-environment) · [Start](#5-start-the-server)
+- [A2A Endpoints](#a2a-endpoints)
+- [Agent Card](#agent-card)
+- [Example: Send a Task](#example-send-a-task)
+- [Supported A2A Methods](#supported-a2a-methods)
+
+**Outbound Data Actions** — Genesys flows call external A2A agents
+- [Overview](#outbound-data-actions-genesys-flows--external-a2a-agents)
+- [Example Data Actions](#example-data-actions)
+- [Quick Start](#quick-start)
+
+**Reference**
+- [Architecture (Bridge Server)](#architecture-bridge-server)
+- [Production Considerations](#production-considerations)
+
+---
+
 ## Two Integration Patterns
 
 This repo covers two independent patterns. Pick the one that matches your use case — or use both.
