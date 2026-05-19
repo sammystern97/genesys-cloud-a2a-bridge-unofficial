@@ -113,6 +113,23 @@ export interface AgentCapabilities {
   stateTransitionHistory?: boolean;
 }
 
+// OpenAPI-style security scheme definitions (A2A spec §4.3)
+export interface ApiKeySecurityScheme {
+  type: "apiKey";
+  in: "header";
+  name: string;
+  description?: string;
+}
+
+export interface HttpBearerSecurityScheme {
+  type: "http";
+  scheme: "bearer";
+  bearerFormat?: string;
+  description?: string;
+}
+
+export type SecurityScheme = ApiKeySecurityScheme | HttpBearerSecurityScheme;
+
 export interface AgentCard {
   name: string;
   description: string;
@@ -122,6 +139,8 @@ export interface AgentCard {
   skills: AgentSkill[];
   defaultInputModes: string[];
   defaultOutputModes: string[];
+  securitySchemes?: Record<string, SecurityScheme>;
+  security?: Array<Record<string, string[]>>;
 }
 
 export interface AgentSkill {
@@ -271,4 +290,8 @@ export interface BridgeConfig {
   agentBaseUrl: string;
   port: number;
   responseTimeoutMs: number;
+  // Auth — at least one must be configured
+  oidcIssuer?: string;       // e.g. https://accounts.google.com
+  oidcAudience?: string;     // expected `aud` claim in incoming JWTs
+  apiKeys?: string[];        // hashed (SHA-256 hex) or raw keys
 }
