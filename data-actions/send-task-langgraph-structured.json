@@ -1,0 +1,108 @@
+{
+  "name": "A2A — Send Task to LangGraph Agent (Structured)",
+  "integrationType": {
+    "id": "custom-rest-actions"
+  },
+  "config": {
+    "request": {
+      "requestUrlTemplate": "https://your-langgraph-agent-url",
+      "requestType": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "x-api-key": "${credentials.apiKey}"
+      },
+      "requestTemplate": "{\"jsonrpc\":\"2.0\",\"id\":\"${input.taskId}\",\"method\":\"tasks/send\",\"params\":{\"id\":\"${input.taskId}\",\"sessionId\":\"${input.sessionId}\",\"message\":{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"text\":\"${input.message}\"},{\"type\":\"data\",\"data\":{\"customerId\":\"${input.customerId}\",\"accountNumber\":\"${input.accountNumber}\",\"channel\":\"genesys-voice\",\"locale\":\"${input.locale}\"}}]}}}"
+    },
+    "response": {
+      "translationMap": {
+        "responseText": "$.result.artifacts[0].parts[0].text",
+        "taskState": "$.result.status.state",
+        "taskId": "$.result.id",
+        "intentDetected": "$.result.artifacts[0].parts[1].data.intent",
+        "suggestedAction": "$.result.artifacts[0].parts[1].data.suggestedAction",
+        "confidence": "$.result.artifacts[0].parts[1].data.confidence"
+      },
+      "translationMapDefaults": {
+        "responseText": "",
+        "taskState": "failed",
+        "taskId": "",
+        "intentDetected": "",
+        "suggestedAction": "",
+        "confidence": "0"
+      },
+      "successTemplate": "{\"responseText\": ${successTemplateUtils.jsonencode(responseText)}, \"taskState\": ${successTemplateUtils.jsonencode(taskState)}, \"taskId\": ${successTemplateUtils.jsonencode(taskId)}, \"intentDetected\": ${successTemplateUtils.jsonencode(intentDetected)}, \"suggestedAction\": ${successTemplateUtils.jsonencode(suggestedAction)}, \"confidence\": ${successTemplateUtils.jsonencode(confidence)}}"
+    }
+  },
+  "contract": {
+    "input": {
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-04/schema#",
+        "title": "Send Task to LangGraph Agent (with Context)",
+        "description": "Send a task to a LangGraph-based A2A agent along with structured customer context in a data part. The agent can use the customer data for personalization and intent detection without re-asking for it.",
+        "type": "object",
+        "required": ["taskId", "sessionId", "message"],
+        "properties": {
+          "taskId": {
+            "description": "Unique task ID.",
+            "type": "string"
+          },
+          "sessionId": {
+            "description": "Session ID for multi-turn continuity.",
+            "type": "string"
+          },
+          "message": {
+            "description": "The user's spoken or typed message.",
+            "type": "string"
+          },
+          "customerId": {
+            "description": "CRM customer ID to include as context. Leave empty if unknown.",
+            "type": "string"
+          },
+          "accountNumber": {
+            "description": "Account number to include as context. Leave empty if unknown.",
+            "type": "string"
+          },
+          "locale": {
+            "description": "BCP-47 locale code (e.g. en-US, es-MX). Defaults to en-US if omitted.",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "output": {
+      "successSchema": {
+        "$schema": "http://json-schema.org/draft-04/schema#",
+        "title": "LangGraph Agent Task Result",
+        "type": "object",
+        "properties": {
+          "responseText": {
+            "description": "The agent's natural language reply.",
+            "type": "string"
+          },
+          "taskState": {
+            "description": "Final task state: completed, failed, canceled, or input-required.",
+            "type": "string"
+          },
+          "taskId": {
+            "description": "The task ID echoed from the response.",
+            "type": "string"
+          },
+          "intentDetected": {
+            "description": "Intent label returned by the LangGraph agent (if emitted in the data part).",
+            "type": "string"
+          },
+          "suggestedAction": {
+            "description": "Action the agent recommends: transfer, escalate, self-serve, etc.",
+            "type": "string"
+          },
+          "confidence": {
+            "description": "Agent confidence score as a string (0–1).",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

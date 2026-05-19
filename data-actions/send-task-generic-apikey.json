@@ -1,0 +1,78 @@
+{
+  "name": "A2A — Send Task (API Key)",
+  "integrationType": {
+    "id": "custom-rest-actions"
+  },
+  "config": {
+    "request": {
+      "requestUrlTemplate": "https://your-a2a-agent-url",
+      "requestType": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "x-api-key": "${credentials.apiKey}"
+      },
+      "requestTemplate": "{\"jsonrpc\":\"2.0\",\"id\":\"${input.taskId}\",\"method\":\"tasks/send\",\"params\":{\"id\":\"${input.taskId}\",\"sessionId\":\"${input.sessionId}\",\"message\":{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"text\":\"${input.message}\"}]}}}"
+    },
+    "response": {
+      "translationMap": {
+        "responseText": "$.result.artifacts[0].parts[0].text",
+        "taskState": "$.result.status.state",
+        "taskId": "$.result.id"
+      },
+      "translationMapDefaults": {
+        "responseText": "",
+        "taskState": "failed",
+        "taskId": ""
+      },
+      "successTemplate": "{\"responseText\": ${successTemplateUtils.jsonencode(responseText)}, \"taskState\": ${successTemplateUtils.jsonencode(taskState)}, \"taskId\": ${successTemplateUtils.jsonencode(taskId)}}"
+    }
+  },
+  "contract": {
+    "input": {
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-04/schema#",
+        "title": "Send A2A Task (API Key)",
+        "description": "Send a text message to any A2A-compliant agent endpoint authenticated with a static API key.",
+        "type": "object",
+        "required": ["taskId", "sessionId", "message"],
+        "properties": {
+          "taskId": {
+            "description": "Unique task ID. Use a UUID or concatenate the conversation ID with a counter (e.g. {{Conversation.Id}}-1).",
+            "type": "string"
+          },
+          "sessionId": {
+            "description": "Session ID for multi-turn continuity. Reuse the same value across turns in a conversation to preserve context.",
+            "type": "string"
+          },
+          "message": {
+            "description": "The user message to send to the agent.",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "output": {
+      "successSchema": {
+        "$schema": "http://json-schema.org/draft-04/schema#",
+        "title": "A2A Task Result",
+        "type": "object",
+        "properties": {
+          "responseText": {
+            "description": "The agent's reply text extracted from the first artifact part.",
+            "type": "string"
+          },
+          "taskState": {
+            "description": "Final task state: completed, failed, canceled, or input-required.",
+            "type": "string"
+          },
+          "taskId": {
+            "description": "The task ID echoed from the response.",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}
